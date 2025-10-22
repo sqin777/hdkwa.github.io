@@ -1,0 +1,1219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DNA Puzzle Game - Level Edition</title>
+    <!-- External resources -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    
+    <!-- Tailwind configuration -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3B82F6', // Blue primary
+                        secondary: '#10B981', // Green secondary
+                        accent: '#8B5CF6', // Purple accent
+                        dnaA: '#EF4444', // A nucleotide - red
+                        dnaT: '#F59E0B', // T nucleotide - orange
+                        dnaC: '#10B981', // C nucleotide - green
+                        dnaG: '#3B82F6', // G nucleotide - blue
+                    },
+                    fontFamily: {
+                        game: ['Poppins', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    
+    <!-- Custom utilities -->
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .puzzle-shadow {
+                box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2), 0 2px 4px -1px rgba(0, 0, 0, 0.1);
+            }
+            .dragging {
+                opacity: 0.7;
+                transform: scale(1.05);
+                cursor: grabbing;
+            }
+            .drop-zone-active {
+                background-color: rgba(59, 130, 246, 0.1);
+                border-color: #3B82F6;
+            }
+            .drop-zone-invalid {
+                background-color: rgba(239, 68, 68, 0.1);
+                border-color: #EF4444;
+            }
+            .animate-float {
+                animation: float 3s ease-in-out infinite;
+            }
+            @keyframes float {
+                0% { transform: translateY(0px); }
+                50% { transform: translateY(-10px); }
+                100% { transform: translateY(0px); }
+            }
+            .animate-pair {
+                animation: pair 0.5s ease-out;
+            }
+            @keyframes pair {
+                0% { transform: scale(0.9) rotate(-5deg); opacity: 0.7; }
+                70% { transform: scale(1.05) rotate(2deg); }
+                100% { transform: scale(1) rotate(0); opacity: 1; }
+            }
+            .animate-level-complete {
+                animation: levelComplete 1s ease-out;
+            }
+            @keyframes levelComplete {
+                0% { transform: scale(0.8); opacity: 0; }
+                50% { transform: scale(1.1); opacity: 1; }
+                100% { transform: scale(1); opacity: 1; }
+            }
+            .animate-susu {
+                animation: susu 2s ease-out infinite alternate;
+            }
+            @keyframes susu {
+                0% { transform: scale(1); color: #3B82F6; }
+                100% { transform: scale(1.1); color: #8B5CF6; }
+            }
+        }
+    </style>
+    
+    <!-- Import fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-purple-50 min-h-screen font-game text-gray-800 overflow-x-hidden">
+    <!-- Header navigation -->
+    <header class="bg-white/80 backdrop-blur-md shadow-sm sticky top-0 z-50 transition-all duration-300">
+        <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+            <div class="flex items-center space-x-2">
+                <i class="fa fa-dna text-primary text-2xl"></i>
+                <h1 class="text-xl md:text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">DNA Puzzle Game</h1>
+            </div>
+            <div class="flex items-center space-x-4">
+                <div class="bg-primary/10 px-3 py-1.5 rounded-full flex items-center">
+                    <i class="fa fa-signal text-primary mr-2"></i>
+                    <span>Level <span id="current-level">1</span>/3</span>
+                </div>
+                <button id="help-btn" class="flex items-center space-x-1 text-gray-600 hover:text-primary transition-colors">
+                    <i class="fa fa-question-circle"></i>
+                    <span class="hidden md:inline">Help</span>
+                </button>
+                <button id="reset-btn" class="flex items-center space-x-1 bg-primary/10 hover:bg-primary/20 text-primary px-3 py-1.5 rounded-full transition-all">
+                    <i class="fa fa-refresh"></i>
+                    <span class="hidden md:inline">Reset</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main game area -->
+    <main class="container mx-auto px-4 py-8">
+        <!-- Level objective提示 -->
+        <div id="level-objective" class="max-w-3xl mx-auto bg-white rounded-xl shadow-md p-6 mb-8">
+            <h2 class="text-xl font-bold mb-3 flex items-center">
+                <i class="fa fa-bullseye text-primary mr-2"></i>
+                <span id="objective-title">Level 1 Objective</span>
+            </h2>
+            <p class="text-gray-600 mb-4" id="objective-description">Create a character with the following traits:</p>
+            <div id="objectives-container" class="grid grid-cols-3 gap-4 text-sm">
+                <!-- Objectives will be generated dynamically via JS -->
+                <div class="bg-blue-50 p-3 rounded-lg flex items-center">
+                    <i class="fa fa-check-circle text-primary mr-2"></i>
+                    <span id="objective-1">Objective trait 1</span>
+                </div>
+                <div class="bg-blue-50 p-3 rounded-lg flex items-center">
+                    <i class="fa fa-check-circle text-primary mr-2"></i>
+                    <span id="objective-2">Objective trait 2</span>
+                </div>
+                <div class="bg-blue-50 p-3 rounded-lg flex items-center hidden">
+                    <i class="fa fa-check-circle text-primary mr-2"></i>
+                    <span id="objective-3">Objective trait 3</span>
+                </div>
+                <div class="bg-blue-50 p-3 rounded-lg flex items-center hidden">
+                    <i class="fa fa-check-circle text-primary mr-2"></i>
+                    <span id="objective-4">Objective trait 4</span>
+                </div>
+                <div class="bg-blue-50 p-3 rounded-lg flex items-center hidden">
+                    <i class="fa fa-check-circle text-primary mr-2"></i>
+                    <span id="objective-5">Objective trait 5</span>
+                </div>
+                <div class="bg-blue-50 p-3 rounded-lg flex items-center hidden">
+                    <i class="fa fa-check-circle text-primary mr-2"></i>
+                    <span id="objective-6">Objective trait 6</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Game main body -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+            <!-- Left: DNA framework -->
+            <div class="lg:col-span-2">
+                <div class="bg-white rounded-2xl shadow-lg p-6 md:p-8 relative overflow-hidden">
+                    <!-- DNA framework decoration -->
+                    <div class="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-dnaA via-dnaT via-dnaC to-dnaG"></div>
+                    
+                    <h3 class="text-xl font-semibold mb-6 text-center">DNA Sequence - 6 Trait Control Positions</h3>
+                    
+                    <!-- DNA position function explanation -->
+                    <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6 text-sm">
+                        <div class="bg-gray-50 p-3 rounded-lg flex items-center">
+                            <span class="inline-block w-3 h-3 bg-dnaA rounded-full mr-2"></span>
+                            <span>Position 1: Controls skin tone</span>
+                        </div>
+                        <div class="bg-gray-50 p-3 rounded-lg flex items-center">
+                            <span class="inline-block w-3 h-3 bg-dnaT rounded-full mr-2"></span>
+                            <span>Position 2: Controls mouth expression</span>
+                        </div>
+                        <div class="bg-gray-50 p-3 rounded-lg flex items-center">
+                            <span class="inline-block w-3 h-3 bg-dnaC rounded-full mr-2"></span>
+                            <span>Position 3: Controls eye color</span>
+                        </div>
+                        <div class="bg-gray-50 p-3 rounded-lg flex items-center">
+                            <span class="inline-block w-3 h-3 bg-dnaG rounded-full mr-2"></span>
+                            <span>Position 4: Controls hair color</span>
+                        </div>
+                        <div class="bg-gray-50 p-3 rounded-lg flex items-center">
+                            <span class="inline-block w-3 h-3 bg-dnaA rounded-full mr-2"></span>
+                            <span>Position 5: Controls ear shape</span>
+                        </div>
+                        <div class="bg-gray-50 p-3 rounded-lg flex items-center">
+                            <span class="inline-block w-3 h-3 bg-dnaT rounded-full mr-2"></span>
+                            <span>Position 6: Controls eye size</span>
+                        </div>
+                    </div>
+                    
+                    <!-- DNA double helix framework - horizontal above the 6 positions -->
+                    <div class="relative dna-frame py-4 px-12 mb-8">
+                        <!-- Upper strand - horizontal -->
+                        <div class="absolute left-0 right-0 top-4 h-1 bg-gray-300 rounded-full"></div>
+                        <!-- Lower strand - horizontal -->
+                        <div class="absolute left-0 right-0 bottom-4 h-1 bg-gray-300 rounded-full"></div>
+                        
+                        <!-- DNA pairing connectors - connecting upper and lower strands -->
+                        <div class="absolute top-4 bottom-4 left-[15%] w-0.5 bg-gray-200"></div>
+                        <div class="absolute top-4 bottom-4 left-[30%] w-0.5 bg-gray-200"></div>
+                        <div class="absolute top-4 bottom-4 left-[45%] w-0.5 bg-gray-200"></div>
+                        <div class="absolute top-4 bottom-4 left-[60%] w-0.5 bg-gray-200"></div>
+                        <div class="absolute top-4 bottom-4 left-[75%] w-0.5 bg-gray-200"></div>
+                        <div class="absolute top-4 bottom-4 left-[90%] w-0.5 bg-gray-200"></div>
+                    </div>
+                    
+                    <!-- DNA puzzle placement area - remove flex-wrap to ensure same line, add scroll support -->
+                    <div class="overflow-x-auto pb-4">
+                        <div id="dna-sequence" class="flex justify-center items-center h-full gap-6 min-w-max">
+                            <!-- Placement areas will be generated dynamically via JS -->
+                        </div>
+                    </div>
+                    
+                    <!-- DNA double helix framework - horizontal below the 6 positions -->
+                    <div class="relative dna-frame py-4 px-12 mt-8">
+                        <!-- Upper strand - horizontal -->
+                        <div class="absolute left-0 right-0 top-4 h-1 bg-gray-300 rounded-full"></div>
+                        <!-- Lower strand - horizontal -->
+                        <div class="absolute left-0 right-0 bottom-4 h-1 bg-gray-300 rounded-full"></div>
+                        
+                        <!-- DNA pairing connectors - connecting upper and lower strands -->
+                        <div class="absolute top-4 bottom-4 left-[15%] w-0.5 bg-gray-200"></div>
+                        <div class="absolute top-4 bottom-4 left-[30%] w-0.5 bg-gray-200"></div>
+                        <div class="absolute top-4 bottom-4 left-[45%] w-0.5 bg-gray-200"></div>
+                        <div class="absolute top-4 bottom-4 left-[60%] w-0.5 bg-gray-200"></div>
+                        <div class="absolute top-4 bottom-4 left-[75%] w-0.5 bg-gray-200"></div>
+                        <div class="absolute top-4 bottom-4 left-[90%] w-0.5 bg-gray-200"></div>
+                    </div>
+                    
+                    <!-- Nucleotide bank -->
+                    <div class="mt-8">
+                        <h4 class="text-lg font-medium mb-4">Nucleotide Bank</h4>
+                        <div id="nucleotide-bank" class="flex flex-wrap gap-4 justify-center">
+                            <!-- Nucleotide puzzles will be generated dynamically via JS -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Right: Character display and traits -->
+            <div class="lg:col-span-1">
+                <div class="bg-white rounded-2xl shadow-lg p-6 md:p-8 h-full flex flex-col items-center justify-center relative overflow-hidden">
+                    <!-- Decorations -->
+                    <div class="absolute top-0 right-0 w-24 h-24 bg-accent/10 rounded-full -mr-12 -mt-12"></div>
+                    <div class="absolute bottom-0 left-0 w-32 h-32 bg-primary/10 rounded-full -ml-16 -mb-16"></div>
+                    
+                    <h3 class="text-xl font-semibold mb-6 text-center relative z-10">DNA Trait Expression</h3>
+                    
+                    <!-- Character image -->
+                    <div id="character" class="relative w-64 h-64 mb-6 animate-float">
+                        <!-- Character traits will be generated dynamically via JS -->
+                        <div class="character-base absolute inset-0">
+                            <!-- Head -->
+                            <div id="head" class="absolute top-8 left-1/2 transform -translate-x-1/2 w-32 h-32 rounded-full bg-yellow-300"></div>
+                            
+                            <!-- Eyes -->
+                            <div id="eyes" class="absolute top-16 left-1/2 transform -translate-x-1/2 flex justify-between w-20">
+                                <div class="eye-left w-6 h-6 rounded-full bg-gray-800"></div>
+                                <div class="eye-right w-6 h-6 rounded-full bg-gray-800"></div>
+                            </div>
+                            
+                            <!-- Mouth -->
+                            <div id="mouth" class="absolute top-28 left-1/2 transform -translate-x-1/2 w-12 h-4 bg-gray-800 rounded-full"></div>
+                            
+                            <!-- Hair -->
+                            <div id="hair" class="absolute top-0 left-1/2 transform -translate-x-1/2 w-40 h-16 bg-black rounded-t-3xl"></div>
+                            
+                            <!-- Nose -->
+                            <div id="nose" class="absolute top-22 left-1/2 transform -translate-x-1/2 w-4 h-6 bg-yellow-400 rounded-full"></div>
+                            
+                            <!-- Ears -->
+                            <div id="ears" class="absolute top-20 left-1/2 transform -translate-x-1/2 w-40 flex justify-between">
+                                <div class="ear-left w-3 h-8 bg-yellow-300 rounded-full"></div>
+                                <div class="ear-right w-3 h-8 bg-yellow-300 rounded-full"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Trait description -->
+                    <div id="traits" class="w-full bg-gray-50 rounded-xl p-4 relative z-10">
+                        <h4 class="font-medium mb-2">Current Traits:</h4>
+                        <ul class="text-gray-600 space-y-1.5">
+                            <li class="flex items-center"><i class="fa fa-check-circle text-secondary mr-2"></i> <span id="trait-skin">Skin Tone: Medium</span></li>
+                            <li class="flex items-center"><i class="fa fa-check-circle text-secondary mr-2"></i> <span id="trait-mouth">Mouth Expression: Neutral</span></li>
+                            <li class="flex items-center"><i class="fa fa-check-circle text-secondary mr-2"></i> <span id="trait-eye-color">Eye Color: Black</span></li>
+                            <li class="flex items-center"><i class="fa fa-check-circle text-secondary mr-2"></i> <span id="trait-hair-color">Hair Color: Black</span></li>
+                            <li class="flex items-center"><i class="fa fa-check-circle text-secondary mr-2"></i> <span id="trait-ear-shape">Ear Shape: Normal</span></li>
+                            <li class="flex items-center"><i class="fa fa-check-circle text-secondary mr-2"></i> <span id="trait-eye-size">Eye Size: Medium</span></li>
+                        </ul>
+                    </div>
+                    
+                    <!-- Pairing progress -->
+                    <div class="w-full mt-6 bg-gray-50 rounded-xl p-4 relative z-10">
+                        <h4 class="font-medium mb-2">Pairing Progress:</h4>
+                        <div class="w-full bg-gray-200 rounded-full h-2.5">
+                            <div id="progress-bar" class="bg-primary h-2.5 rounded-full w-0 transition-all duration-500"></div>
+                        </div>
+                        <p class="text-sm text-gray-500 mt-1 text-right" id="progress-text">0/6 completed pairs</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Game instructions -->
+        <div class="mt-12 max-w-3xl mx-auto bg-white/80 backdrop-blur-sm rounded-xl shadow-md p-6">
+            <h3 class="text-xl font-semibold mb-4 flex items-center">
+                <i class="fa fa-info-circle text-primary mr-2"></i> How to Play
+            </h3>
+            <div class="grid md:grid-cols-2 gap-6 text-gray-600">
+                <div>
+                    <p class="mb-2"><strong>Nucleotide Pairing & Trait Variations:</strong></p>
+                    <ul class="list-disc list-inside space-y-2">
+                        <li><span class="inline-block w-4 h-4 bg-dnaA rounded-full mr-1"></span>A(top) + T(bottom): Trait variation A</li>
+                        <li><span class="inline-block w-4 h-4 bg-dnaT rounded-full mr-1"></span>T(top) + A(bottom): Trait variation B</li>
+                        <li><span class="inline-block w-4 h-4 bg-dnaC rounded-full mr-1"></span>C(top) + G(bottom): Trait variation C</li>
+                        <li><span class="inline-block w-4 h-4 bg-dnaG rounded-full mr-1"></span>G(top) + C(bottom): Trait variation D</li>
+                    </ul>
+                </div>
+                <div>
+                    <p class="mb-2"><strong>Gameplay:</strong></p>
+                    <ol class="list-decimal list-inside space-y-1">
+                        <li>Complete the target trait combination for each level</li>
+                        <li>Drag A, T, C, G from the nucleotide bank to the 6 position areas</li>
+                        <li>Each position must follow A-T or C-G pairing rules</li>
+                        <li>Automatically progress to next level when objectives are met</li>
+                        <li>Special reward for completing all 3 levels</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </main>
+    
+    <!-- Level complete modal -->
+    <div id="level-complete-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center opacity-0 pointer-events-none transition-opacity duration-300">
+        <div class="bg-white rounded-2xl max-w-md w-full mx-4 p-8 transform scale-95 transition-transform duration-300">
+            <div class="text-center">
+                <div class="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-4">
+                    <i class="fa fa-trophy text-3xl text-yellow-500"></i>
+                </div>
+                <h3 class="text-2xl font-bold mb-2" id="level-complete-title">Level 1 Complete!</h3>
+                <p class="text-gray-600 mb-6" id="level-complete-message">Congratulations! You've successfully matched the target traits!</p>
+                <button id="next-level-btn" class="w-full bg-primary hover:bg-primary/90 text-white py-3 rounded-lg transition-colors text-lg font-medium">
+                    Next Level
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Final completion screen -->
+    <div id="final-completion" class="fixed inset-0 bg-gradient-to-br from-purple-500 to-blue-600 z-50 flex flex-col items-center justify-center opacity-0 pointer-events-none transition-opacity duration-500">
+        <div class="text-center p-8 max-w-lg">
+            <h2 class="text-5xl md:text-7xl font-extrabold mb-6 animate-susu" style="text-shadow: 2px 2px 4px rgba(0,0,0,0.2);">SUSU</h2>
+            <p class="text-white text-xl mb-8">Congratulations on completing all DNA puzzles!</p>
+            <div class="inline-block bg-white/20 backdrop-blur-sm rounded-full px-6 py-3 text-white mb-8">
+                <i class="fa fa-star mr-2"></i>
+                <i class="fa fa-star mr-2"></i>
+                <i class="fa fa-star mr-2"></i>
+                <i class="fa fa-star mr-2"></i>
+                <i class="fa fa-star"></i>
+            </div>
+            <button id="play-again-btn" class="bg-white text-primary hover:bg-gray-100 px-8 py-3 rounded-lg transition-colors text-lg font-medium">
+                Play Again
+            </button>
+        </div>
+    </div>
+    
+    <!-- Help modal -->
+    <div id="help-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center opacity-0 pointer-events-none transition-opacity duration-300">
+        <div class="bg-white rounded-2xl max-w-md w-full mx-4 p-6 transform scale-95 transition-transform duration-300">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold">Game Help</h3>
+                <button id="close-help" class="text-gray-500 hover:text-gray-700">
+                    <i class="fa fa-times text-xl"></i>
+                </button>
+            </div>
+            <div class="space-y-4 text-gray-600">
+                <div>
+                    <h4 class="font-semibold mb-1">Nucleotide Pairing Rules</h4>
+                    <p>Each DNA position has two areas (top and bottom) that must contain complementary nucleotides: A can only pair with T, and C can only pair with G.</p>
+                </div>
+                <div>
+                    <h4 class="font-semibold mb-1">Position and Trait Correspondence</h4>
+                    <p>1:Skin tone, 2:Mouth expression, 3:Eye color, 4:Hair color, 5:Ear shape, 6:Eye size</p>
+                </div>
+                <div>
+                    <h4 class="font-semibold mb-1">Level System</h4>
+                    <p>After completing the target trait combination for the current level, you'll automatically progress to the next level. There are 3 levels total, with a reward for completing all levels.</p>
+                </div>
+            </div>
+            <button id="got-it" class="mt-6 w-full bg-primary hover:bg-primary/90 text-white py-2 rounded-lg transition-colors">
+                Got it
+            </button>
+        </div>
+    </div>
+    
+    <!-- Success notification -->
+    <div id="success-toast" class="fixed bottom-6 right-6 bg-green-500 text-white px-4 py-3 rounded-lg shadow-lg transform translate-y-20 opacity-0 transition-all duration-500 flex items-center">
+        <i class="fa fa-check-circle mr-2"></i>
+        <span>Nucleotide pairing successful! Traits updated</span>
+    </div>
+    
+    <!-- Error notification -->
+    <div id="error-toast" class="fixed bottom-6 right-6 bg-red-500 text-white px-4 py-3 rounded-lg shadow-lg transform translate-y-20 opacity-0 transition-all duration-500 flex items-center">
+        <i class="fa fa-times-circle mr-2"></i>
+        <span>Pairing error! Only A-T and C-G can pair</span>
+    </div>
+    
+    <!-- Footer -->
+    <footer class="bg-white/80 backdrop-blur-sm mt-16 py-6 border-t">
+        <div class="container mx-auto px-4 text-center text-gray-500">
+            <p>DNA Puzzle Game &copy; 2023 | Explore the mysteries of genetic code</p>
+        </div>
+    </footer>
+
+    <script>
+        // Game configuration - enhanced randomization
+        const GAME_CONFIG = {
+            dnaLength: 6, // DNA sequence length, set to 6 positions
+            nucleotides: ['A', 'T', 'C', 'G'], // Nucleotide types
+            currentLevel: 1,
+            totalLevels: 3,
+            currentLevelData: null, // Random data for current level
+            // Number of objectives per level
+            objectivesPerLevel: [2, 4, 6],
+            // Nucleotide pairing rules
+            pairingRules: {
+                'A': 'T',
+                'T': 'A',
+                'C': 'G',
+                'G': 'C'
+            },
+            // Colors for each nucleotide
+            nucleotideColors: {
+                'A': 'bg-dnaA text-white',
+                'T': 'bg-dnaT text-white',
+                'C': 'bg-dnaC text-white',
+                'G': 'bg-dnaG text-white'
+            },
+            // Trait to category mapping - for displaying category in objectives
+            traitToCategory: {
+                'skin': 'skin tone',
+                'mouth': 'expression',
+                'eye-color': 'eye color',
+                'hair-color': 'hair color',
+                'ear-shape': 'ear shape',
+                'eye-size': 'eye size'
+            },
+            // Trait library - for random level objective generation
+            traitTypes: {
+                'skin': [
+                    'Very fair', 'Medium', 'Dark brown', 'Ebony'
+                ],
+                'mouth': [
+                    'Smiling', 'Neutral', 'Frowning', 'Laughing'
+                ],
+                'eye-color': [
+                    'Bright blue', 'Emerald green', 'Dark brown', 'Violet'
+                ],
+                'hair-color': [
+                    'Jet black', 'Chocolate brown', 'Blonde', 'Crimson red'
+                ],
+                'ear-shape': [
+                    'Small ears', 'Normal ears', 'Large ears', 'Protruding ears'
+                ],
+                'eye-size': [
+                    'Small eyes', 'Medium eyes', 'Large eyes', 'Oversized eyes'
+                ]
+            },
+            // Nucleotide position to trait mapping - each position controls a specific trait
+            traitMapping: {
+                // Position 1: Controls skin tone
+                0: {
+                    traitType: 'skin',
+                    'A-T': { type: 'Very fair', style: 'bg-yellow-100', earsStyle: 'bg-yellow-100', noseStyle: 'bg-yellow-200' },
+                    'T-A': { type: 'Medium', style: 'bg-yellow-300', earsStyle: 'bg-yellow-300', noseStyle: 'bg-yellow-400' },
+                    'C-G': { type: 'Dark brown', style: 'bg-amber-600', earsStyle: 'bg-amber-600', noseStyle: 'bg-amber-700' },
+                    'G-C': { type: 'Ebony', style: 'bg-orange-800', earsStyle: 'bg-orange-800', noseStyle: 'bg-orange-900' }
+                },
+                // Position 2: Controls mouth expression
+                1: {
+                    traitType: 'mouth',
+                    'A-T': { type: 'Smiling', style: 'w-12 h-4 bg-gray-800 rounded-b-full' },
+                    'T-A': { type: 'Neutral', style: 'w-12 h-4 bg-gray-800 rounded-full' },
+                    'C-G': { type: 'Frowning', style: 'w-12 h-4 bg-gray-800 rounded-t-full' },
+                    'G-C': { type: 'Laughing', style: 'w-14 h-6 bg-gray-800 rounded-b-full' }
+                },
+                // Position 3: Controls eye color
+                2: {
+                    traitType: 'eye-color',
+                    'A-T': { type: 'Bright blue', style: 'bg-blue-400' },
+                    'T-A': { type: 'Emerald green', style: 'bg-green-500' },
+                    'C-G': { type: 'Dark brown', style: 'bg-amber-900' },
+                    'G-C': { type: 'Violet', style: 'bg-purple-600' }
+                },
+                // Position 4: Controls hair color
+                3: {
+                    traitType: 'hair-color',
+                    'A-T': { type: 'Jet black', style: 'bg-gray-950' },
+                    'T-A': { type: 'Chocolate brown', style: 'bg-amber-900' },
+                    'C-G': { type: 'Blonde', style: 'bg-yellow-300' },
+                    'G-C': { type: 'Crimson red', style: 'bg-red-700' }
+                },
+                // Position 5: Controls ear shape
+                4: {
+                    traitType: 'ear-shape',
+                    'A-T': { type: 'Small ears', style: 'w-2.5 h-6 rounded-full' },
+                    'T-A': { type: 'Normal ears', style: 'w-3 h-8 rounded-full' },
+                    'C-G': { type: 'Large ears', style: 'w-4 h-10 rounded-full' },
+                    'G-C': { type: 'Protruding ears', style: 'w-3 h-8 rounded-full translate-x-[-5px]' }
+                },
+                // Position 6: Controls eye size
+                5: {
+                    traitType: 'eye-size',
+                    'A-T': { type: 'Small eyes', style: 'w-5 h-5 rounded-full' },
+                    'T-A': { type: 'Medium eyes', style: 'w-6 h-6 rounded-full' },
+                    'C-G': { type: 'Large eyes', style: 'w-7 h-7 rounded-full' },
+                    'G-C': { type: 'Oversized eyes', style: 'w-8 h-8 rounded-full' }
+                }
+            }
+        };
+
+        // DOM elements
+        const dnaSequenceEl = document.getElementById('dna-sequence');
+        const nucleotideBankEl = document.getElementById('nucleotide-bank');
+        const helpBtn = document.getElementById('help-btn');
+        const helpModal = document.getElementById('help-modal');
+        const closeHelpBtn = document.getElementById('close-help');
+        const gotItBtn = document.getElementById('got-it');
+        const resetBtn = document.getElementById('reset-btn');
+        const progressBar = document.getElementById('progress-bar');
+        const progressText = document.getElementById('progress-text');
+        const successToast = document.getElementById('success-toast');
+        const errorToast = document.getElementById('error-toast');
+        const currentLevelEl = document.getElementById('current-level');
+        const levelObjectiveTitle = document.getElementById('objective-title');
+        const levelObjectiveDescription = document.getElementById('objective-description');
+        const objectivesContainer = document.getElementById('objectives-container');
+        const levelCompleteModal = document.getElementById('level-complete-modal');
+        const levelCompleteTitle = document.getElementById('level-complete-title');
+        const levelCompleteMessage = document.getElementById('level-complete-message');
+        const nextLevelBtn = document.getElementById('next-level-btn');
+        const finalCompletionScreen = document.getElementById('final-completion');
+        const playAgainBtn = document.getElementById('play-again-btn');
+        
+        // Initialize game
+        function initGame() {
+            setupLevel(GAME_CONFIG.currentLevel);
+            setupEventListeners();
+            updateProgress();
+        }
+        
+        // Generate random level data
+        function generateRandomLevelData(levelNumber) {
+            // Get the number of objectives for current level (levels start at 1, array index starts at 0)
+            const objectiveCount = GAME_CONFIG.objectivesPerLevel[levelNumber - 1];
+            
+            // Randomly select specified number of different types from all trait types
+            const allTraitTypes = Object.keys(GAME_CONFIG.traitTypes);
+            const shuffledTypes = [...allTraitTypes].sort(() => 0.5 - Math.random());
+            const selectedTypes = shuffledTypes.slice(0, objectiveCount);
+            
+            // Randomly select a target value for each selected trait type
+            const targetTraits = {};
+            const objectives = [];
+            const objectiveDetails = []; // Store objectives with trait category info
+            
+            selectedTypes.forEach(type => {
+                const traitValues = GAME_CONFIG.traitTypes[type];
+                // Randomly select a trait value
+                const randomValue = traitValues[Math.floor(Math.random() * traitValues.length)];
+                targetTraits[type] = randomValue;
+                objectives.push(randomValue);
+                
+                // Add objective description with trait category info (e.g., "Smiling (expression)")
+                const category = GAME_CONFIG.traitToCategory[type];
+                objectiveDetails.push(`${randomValue} (${category})`);
+            });
+            
+            return {
+                title: `Level ${levelNumber} Objective`,
+                description: "Create a character with the following traits:",
+                objectives: objectives,
+                objectiveDetails: objectiveDetails, // Objectives with trait category info
+                targetTraits: targetTraits,
+                objectiveCount: objectiveCount
+            };
+        }
+        
+        // Setup level
+        function setupLevel(level) {
+            if (level > GAME_CONFIG.totalLevels) {
+                showFinalCompletion();
+                return;
+            }
+            
+            // Generate random objective data for current level
+            GAME_CONFIG.currentLevelData = generateRandomLevelData(level);
+            GAME_CONFIG.currentLevel = level;
+            currentLevelEl.textContent = level;
+            
+            // Update level objective display - use objectives with trait category info
+            const levelData = GAME_CONFIG.currentLevelData;
+            levelObjectiveTitle.textContent = levelData.title;
+            levelObjectiveDescription.textContent = levelData.description;
+            
+            // Show appropriate number of objective items
+            const objectiveElements = objectivesContainer.querySelectorAll('div');
+            objectiveElements.forEach((el, index) => {
+                if (index < levelData.objectiveCount) {
+                    el.classList.remove('hidden');
+                    el.querySelector('span').textContent = levelData.objectiveDetails[index];
+                } else {
+                    el.classList.add('hidden');
+                }
+            });
+            
+            // Reset DNA sequence and nucleotide bank
+            createDnaSequence();
+            createNucleotideBank();
+            
+            // Reset character traits
+            resetCharacter();
+            
+            // Update progress
+            updateProgress();
+        }
+        
+        // Create DNA sequence placement area - each position has two placement points
+        function createDnaSequence() {
+            dnaSequenceEl.innerHTML = '';
+            
+            for (let i = 0; i < GAME_CONFIG.dnaLength; i++) {
+                const pairContainer = document.createElement('div');
+                pairContainer.className = 'pair-container flex flex-col items-center justify-center w-20';
+                
+                // Create top placement area
+                const topDropZone = document.createElement('div');
+                topDropZone.id = `drop-zone-${i}-top`;
+                topDropZone.className = 'drop-zone w-16 h-16 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center transition-all duration-300 hover:border-primary/50 mb-2 relative';
+                topDropZone.dataset.position = i;
+                topDropZone.dataset.strand = 'top';
+                
+                // Create bottom placement area
+                const bottomDropZone = document.createElement('div');
+                bottomDropZone.id = `drop-zone-${i}-bottom`;
+                bottomDropZone.className = 'drop-zone w-16 h-16 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center transition-all duration-300 hover:border-primary/50 relative';
+                bottomDropZone.dataset.position = i;
+                bottomDropZone.dataset.strand = 'bottom';
+                
+                // Add position marker
+                const positionMarker = document.createElement('span');
+                positionMarker.className = 'text-gray-400 text-xs absolute -bottom-5 left-1/2 transform -translate-x-1/2';
+                positionMarker.textContent = `${i+1}`;
+                bottomDropZone.appendChild(positionMarker.cloneNode(true));
+                
+                pairContainer.appendChild(topDropZone);
+                pairContainer.appendChild(bottomDropZone);
+                dnaSequenceEl.appendChild(pairContainer);
+            }
+            
+            // Add event listeners to newly created drop zones
+            setupDropZoneListeners();
+        }
+        
+        // Add event listeners to drop zones
+        function setupDropZoneListeners() {
+            document.querySelectorAll('.drop-zone').forEach(zone => {
+                // First remove any existing event listeners to prevent duplication
+                const newZone = zone.cloneNode(true);
+                zone.parentNode.replaceChild(newZone, zone);
+                
+                // Add new event listeners
+                newZone.addEventListener('dragover', handleDragOver);
+                newZone.addEventListener('dragenter', handleDragEnter);
+                newZone.addEventListener('dragleave', handleDragLeave);
+                newZone.addEventListener('drop', handleDrop);
+            });
+        }
+        
+        // Create nucleotide bank - randomize nucleotide count and order
+        function createNucleotideBank() {
+            nucleotideBankEl.innerHTML = '';
+            
+            // Randomly determine the count for each nucleotide (3-5), ensuring enough for player use
+            const nucleotideCounts = {
+                'A': 3 + Math.floor(Math.random() * 3),
+                'T': 3 + Math.floor(Math.random() * 3),
+                'C': 3 + Math.floor(Math.random() * 3),
+                'G': 3 + Math.floor(Math.random() * 3)
+            };
+            
+            // Create all nucleotide elements
+            let nucleotides = [];
+            Object.keys(nucleotideCounts).forEach(nucleotide => {
+                for (let i = 0; i < nucleotideCounts[nucleotide]; i++) {
+                    const nucleotideEl = document.createElement('div');
+                    nucleotideEl.className = `nucleotide ${GAME_CONFIG.nucleotideColors[nucleotide]} w-16 h-16 rounded-lg flex items-center justify-center text-2xl font-bold cursor-grab puzzle-shadow transition-all duration-300 hover:scale-105`;
+                    nucleotideEl.textContent = nucleotide;
+                    nucleotideEl.setAttribute('draggable', 'true');
+                    nucleotideEl.dataset.nucleotide = nucleotide;
+                    
+                    nucleotides.push(nucleotideEl);
+                }
+            });
+            
+            // Randomly sort nucleotides
+            nucleotides.sort(() => 0.5 - Math.random());
+            
+            // Add to nucleotide bank
+            nucleotides.forEach(nucleotide => {
+                nucleotide.addEventListener('dragstart', handleDragStart);
+                nucleotide.addEventListener('dragend', handleDragEnd);
+                nucleotideBankEl.appendChild(nucleotide);
+            });
+        }
+        
+        // Reset character traits
+        function resetCharacter() {
+            // Reset to default traits
+            document.getElementById('head').className = 'absolute top-8 left-1/2 transform -translate-x-1/2 w-32 h-32 rounded-full bg-yellow-300';
+            document.getElementById('mouth').className = 'absolute top-28 left-1/2 transform -translate-x-1/2 w-12 h-4 bg-gray-800 rounded-full';
+            
+            const eyes = document.getElementById('eyes').querySelectorAll('div');
+            eyes.forEach(eye => {
+                eye.className = 'w-6 h-6 rounded-full bg-gray-800';
+            });
+            
+            document.getElementById('hair').className = 'absolute top-0 left-1/2 transform -translate-x-1/2 w-40 h-16 bg-black rounded-t-3xl';
+            
+            const ears = document.getElementById('ears').querySelectorAll('div');
+            ears.forEach(ear => {
+                ear.className = 'w-3 h-8 bg-yellow-300 rounded-full';
+            });
+            
+            // Reset trait text
+            document.getElementById('trait-skin').textContent = 'Skin Tone: Medium';
+            document.getElementById('trait-mouth').textContent = 'Mouth Expression: Neutral';
+            document.getElementById('trait-eye-color').textContent = 'Eye Color: Black';
+            document.getElementById('trait-hair-color').textContent = 'Hair Color: Black';
+            document.getElementById('trait-ear-shape').textContent = 'Ear Shape: Normal';
+            document.getElementById('trait-eye-size').textContent = 'Eye Size: Medium';
+        }
+        
+        // Setup event listeners
+        function setupEventListeners() {
+            // Help modal events
+            helpBtn.addEventListener('click', openHelpModal);
+            closeHelpBtn.addEventListener('click', closeHelpModal);
+            gotItBtn.addEventListener('click', closeHelpModal);
+            
+            // Close when clicking outside modal
+            helpModal.addEventListener('click', (e) => {
+                if (e.target === helpModal) {
+                    closeHelpModal();
+                }
+            });
+            
+            // Reset button event
+            resetBtn.addEventListener('click', () => {
+                setupLevel(GAME_CONFIG.currentLevel);
+            });
+            
+            // Next level button event
+            nextLevelBtn.addEventListener('click', () => {
+                closeLevelCompleteModal();
+                setupLevel(GAME_CONFIG.currentLevel + 1);
+            });
+            
+            // Play again button event
+            playAgainBtn.addEventListener('click', () => {
+                finalCompletionScreen.classList.add('opacity-0', 'pointer-events-none');
+                document.body.style.overflow = '';
+                setupLevel(1);
+            });
+            
+            // Header effect on scroll
+            window.addEventListener('scroll', () => {
+                const header = document.querySelector('header');
+                if (window.scrollY > 10) {
+                    header.classList.add('py-2', 'shadow');
+                    header.classList.remove('py-3');
+                } else {
+                    header.classList.add('py-3');
+                    header.classList.remove('py-2', 'shadow');
+                }
+            });
+        }
+        
+        // Get complementary strand drop zone
+        function getComplementaryZone(zone) {
+            const position = zone.dataset.position;
+            const strand = zone.dataset.strand;
+            const complementaryStrand = strand === 'top' ? 'bottom' : 'top';
+            
+            return document.getElementById(`drop-zone-${position}-${complementaryStrand}`);
+        }
+        
+        // Check if placement is valid
+        function isPlacementValid(zone, nucleotide) {
+            const complementaryZone = getComplementaryZone(zone);
+            const complementaryNucleotide = complementaryZone.querySelector('.nucleotide');
+            
+            // If complementary zone has a nucleotide, check if it matches
+            if (complementaryNucleotide) {
+                return GAME_CONFIG.pairingRules[nucleotide] === complementaryNucleotide.dataset.nucleotide;
+            }
+            
+            // Complementary zone is empty, can always place
+            return true;
+        }
+        
+        // Drag start handler
+        function handleDragStart(e) {
+            // Store dragged nucleotide type
+            e.dataTransfer.setData('text/plain', this.dataset.nucleotide);
+            // Add drag visual effect
+            setTimeout(() => {
+                this.classList.add('dragging', 'opacity-50');
+            }, 0);
+        }
+        
+        // Drag end handler
+        function handleDragEnd() {
+            // Remove drag visual effect
+            this.classList.remove('dragging', 'opacity-50');
+            
+            // Reset all drop zone styles
+            document.querySelectorAll('.drop-zone').forEach(zone => {
+                zone.classList.remove('drop-zone-active', 'drop-zone-invalid');
+            });
+        }
+        
+        // Drag over handler
+        function handleDragOver(e) {
+            e.preventDefault(); // Allow drop
+            
+            // Check if current zone already has a nucleotide
+            if (this.querySelector('.nucleotide')) {
+                return;
+            }
+            
+            // Get dragged nucleotide type
+            const nucleotide = e.dataTransfer.getData('text/plain');
+            
+            // Show different styles based on validity
+            if (isPlacementValid(this, nucleotide)) {
+                this.classList.add('drop-zone-active');
+                this.classList.remove('drop-zone-invalid');
+            } else {
+                this.classList.add('drop-zone-invalid');
+                this.classList.remove('drop-zone-active');
+            }
+        }
+        
+        // Drag enter handler
+        function handleDragEnter(e) {
+            e.preventDefault();
+        }
+        
+        // Drag leave handler
+        function handleDragLeave() {
+            // Remove drop zone active styles
+            this.classList.remove('drop-zone-active', 'drop-zone-invalid');
+        }
+        
+        // Drop handler
+        function handleDrop(e) {
+            e.preventDefault();
+            // Remove drop zone active styles
+            this.classList.remove('drop-zone-active', 'drop-zone-invalid');
+            
+            // Check if current zone already has a nucleotide
+            if (this.querySelector('.nucleotide')) {
+                return;
+            }
+            
+            // Get dragged nucleotide type
+            const nucleotide = e.dataTransfer.getData('text/plain');
+            
+            // Check if placement is valid
+            if (!isPlacementValid(this, nucleotide)) {
+                showErrorToast();
+                return;
+            }
+            
+            // Clear current drop zone content
+            this.innerHTML = '';
+            
+            // Add position marker (if bottom zone)
+            if (this.dataset.strand === 'bottom') {
+                const positionMarker = document.createElement('span');
+                positionMarker.className = 'text-gray-400 text-xs absolute -bottom-5 left-1/2 transform -translate-x-1/2';
+                positionMarker.textContent = `${parseInt(this.dataset.position) + 1}`;
+                this.appendChild(positionMarker);
+            }
+            
+            // Create new nucleotide element and add to drop zone
+            const nucleotideEl = document.createElement('div');
+            nucleotideEl.className = `nucleotide ${GAME_CONFIG.nucleotideColors[nucleotide]} w-14 h-14 rounded-lg flex items-center justify-center text-2xl font-bold puzzle-shadow z-10`;
+            nucleotideEl.textContent = nucleotide;
+            nucleotideEl.dataset.nucleotide = nucleotide;
+            
+            // Add click to remove functionality
+            nucleotideEl.addEventListener('click', function() {
+                // Remove current nucleotide
+                this.remove();
+                // Update character traits
+                updateCharacter();
+                // Update progress
+                updateProgress();
+            });
+            
+            this.appendChild(nucleotideEl);
+            
+            // Add placement animation
+            nucleotideEl.animate([
+                { transform: 'scale(0.8)', opacity: 0 },
+                { transform: 'scale(1)', opacity: 1 }
+            ], {
+                duration: 300,
+                easing: 'ease-out'
+            });
+            
+            // Check if pairing is complete
+            const complementaryZone = getComplementaryZone(this);
+            if (complementaryZone.querySelector('.nucleotide')) {
+                // Add pairing success animation
+                nucleotideEl.classList.add('animate-pair');
+                complementaryZone.querySelector('.nucleotide').classList.add('animate-pair');
+                
+                // Remove animation class after short delay
+                setTimeout(() => {
+                    nucleotideEl.classList.remove('animate-pair');
+                    complementaryZone.querySelector('.nucleotide').classList.remove('animate-pair');
+                }, 500);
+                
+                showSuccessToast();
+            }
+            
+            // Update character traits
+            updateCharacter();
+            // Update progress
+            updateProgress();
+            
+            // Check if level objectives are met
+            checkLevelCompletion();
+        }
+        
+        // Check if level is complete
+        function checkLevelCompletion() {
+            const targetTraits = GAME_CONFIG.currentLevelData.targetTraits;
+            let allObjectivesMet = true;
+            
+            // Check if each target trait is achieved
+            Object.keys(targetTraits).forEach(traitType => {
+                const traitElement = document.getElementById(`trait-${traitType}`);
+                const currentTrait = traitElement.textContent.split(': ')[1];
+                
+                if (currentTrait !== targetTraits[traitType]) {
+                    allObjectivesMet = false;
+                }
+            });
+            
+            // If all objectives are met, show level complete modal
+            if (allObjectivesMet) {
+                setTimeout(() => {
+                    showLevelCompleteModal();
+                }, 500);
+            }
+        }
+        
+        // Show level complete modal
+        function showLevelCompleteModal() {
+            levelCompleteTitle.textContent = `Level ${GAME_CONFIG.currentLevel} Complete!`;
+            
+            if (GAME_CONFIG.currentLevel < GAME_CONFIG.totalLevels) {
+                levelCompleteMessage.textContent = "Congratulations! You've successfully matched the target traits! Ready for the next challenge?";
+            } else {
+                levelCompleteMessage.textContent = "Congratulations! You've completed all levels! Ready to see your final reward?";
+            }
+            
+            levelCompleteModal.classList.remove('opacity-0', 'pointer-events-none');
+            levelCompleteModal.querySelector('div').classList.remove('scale-95');
+            levelCompleteModal.querySelector('div').classList.add('scale-100');
+            document.body.style.overflow = 'hidden';
+            
+            // Add celebration animation to character
+            const character = document.getElementById('character');
+            character.animate([
+                { transform: 'translateY(0) rotate(0deg)' },
+                { transform: 'translateY(-20px) rotate(5deg)' },
+                { transform: 'translateY(-20px) rotate(-5deg)' },
+                { transform: 'translateY(0) rotate(0deg)' }
+            ], {
+                duration: 1000,
+                easing: 'ease-in-out'
+            });
+        }
+        
+        // Close level complete modal
+        function closeLevelCompleteModal() {
+            levelCompleteModal.classList.add('opacity-0', 'pointer-events-none');
+            levelCompleteModal.querySelector('div').classList.remove('scale-100');
+            levelCompleteModal.querySelector('div').classList.add('scale-95');
+            document.body.style.overflow = '';
+        }
+        
+        // Show final completion screen
+        function showFinalCompletion() {
+            finalCompletionScreen.classList.remove('opacity-0', 'pointer-events-none');
+            document.body.style.overflow = 'hidden';
+        }
+        
+        // Show success notification
+        function showSuccessToast() {
+            successToast.classList.remove('translate-y-20', 'opacity-0');
+            
+            setTimeout(() => {
+                successToast.classList.add('translate-y-20', 'opacity-0');
+            }, 2000);
+        }
+        
+        // Show error notification
+        function showErrorToast() {
+            errorToast.classList.remove('translate-y-20', 'opacity-0');
+            
+            setTimeout(() => {
+                errorToast.classList.add('translate-y-20', 'opacity-0');
+            }, 2000);
+        }
+        
+        // Update pairing progress
+        function updateProgress() {
+            let completedPairs = 0;
+            
+            // Check if each position has a completed pair
+            for (let i = 0; i < GAME_CONFIG.dnaLength; i++) {
+                const topNucleotide = document.querySelector(`#drop-zone-${i}-top .nucleotide`);
+                const bottomNucleotide = document.querySelector(`#drop-zone-${i}-bottom .nucleotide`);
+                
+                if (topNucleotide && bottomNucleotide) {
+                    // Check if it's a valid pair
+                    if (GAME_CONFIG.pairingRules[topNucleotide.dataset.nucleotide] === bottomNucleotide.dataset.nucleotide) {
+                        completedPairs++;
+                    }
+                }
+            }
+            
+            // Update progress bar and text
+            const progressPercentage = (completedPairs / GAME_CONFIG.dnaLength) * 100;
+            progressBar.style.width = `${progressPercentage}%`;
+            progressText.textContent = `${completedPairs}/${GAME_CONFIG.dnaLength} completed pairs`;
+            
+            // Add special effect if all pairs are completed
+            if (completedPairs === GAME_CONFIG.dnaLength) {
+                progressBar.classList.add('bg-green-500');
+            } else {
+                progressBar.classList.remove('bg-green-500');
+            }
+        }
+        
+        // Update character traits
+        function updateCharacter() {
+            // Get current DNA sequence pairing status
+            const dnaPairs = [];
+            for (let i = 0; i < GAME_CONFIG.dnaLength; i++) {
+                const topNucleotide = document.querySelector(`#drop-zone-${i}-top .nucleotide`);
+                const bottomNucleotide = document.querySelector(`#drop-zone-${i}-bottom .nucleotide`);
+                
+                if (topNucleotide && bottomNucleotide && 
+                    GAME_CONFIG.pairingRules[topNucleotide.dataset.nucleotide] === bottomNucleotide.dataset.nucleotide) {
+                    dnaPairs.push(`${topNucleotide.dataset.nucleotide}-${bottomNucleotide.dataset.nucleotide}`);
+                } else {
+                    dnaPairs.push(null);
+                }
+            }
+            
+            // Each position controls a specific trait
+            for (let i = 0; i < GAME_CONFIG.dnaLength; i++) {
+                if (dnaPairs[i]) {
+                    updateTraitByPosition(i, dnaPairs[i]);
+                }
+            }
+        }
+        
+        // Update specific trait by position
+        function updateTraitByPosition(position, pair) {
+            const traitConfig = GAME_CONFIG.traitMapping[position];
+            const trait = traitConfig[pair];
+            const traitType = traitConfig.traitType;
+            
+            // Apply different update logic based on trait type
+            switch(traitType) {
+                case 'skin':
+                    // Skin tone affects head, ears, and nose
+                    const head = document.getElementById('head');
+                    const ears = document.getElementById('ears').querySelectorAll('div');
+                    const nose = document.getElementById('nose');
+                    
+                    // Keep basic head shape, only change color
+                    head.className = `absolute top-8 left-1/2 transform -translate-x-1/2 w-32 h-32 rounded-full ${trait.style}`;
+                    
+                    // Update ear colors
+                    ears.forEach(ear => {
+                        // Keep ear shape, only change color
+                        const shapeClasses = Array.from(ear.classList).filter(cls => 
+                            (cls.startsWith('w-') || cls.startsWith('h-') || cls.startsWith('rounded') || cls.startsWith('translate')) && 
+                            !cls.startsWith('bg-')
+                        ).join(' ');
+                        ear.className = `${shapeClasses} ${trait.earsStyle}`;
+                    });
+                    
+                    // Update nose color
+                    const noseShapeClasses = Array.from(nose.classList).filter(cls => 
+                        (cls.startsWith('w-') || cls.startsWith('h-') || cls.startsWith('rounded')) && 
+                        !cls.startsWith('bg-')
+                    ).join(' ');
+                    nose.className = `absolute top-22 left-1/2 transform -translate-x-1/2 ${noseShapeClasses} ${trait.noseStyle}`;
+                    
+                    // Update trait text
+                    document.getElementById(`trait-${traitType}`).textContent = `Skin Tone: ${trait.type}`;
+                    break;
+                    
+                case 'mouth':
+                    const mouth = document.getElementById('mouth');
+                    // Keep mouth position, only change expression
+                    mouth.className = `absolute top-28 left-1/2 transform -translate-x-1/2 ${trait.style}`;
+                    document.getElementById(`trait-${traitType}`).textContent = `Mouth Expression: ${trait.type}`;
+                    break;
+                    
+                case 'eye-color':
+                    const eyes = document.getElementById('eyes').querySelectorAll('div');
+                    eyes.forEach(eye => {
+                        // Keep eye size, only change color
+                        const sizeClasses = Array.from(eye.classList).filter(cls => 
+                            cls.startsWith('w-') || cls.startsWith('h-') || cls.startsWith('rounded')
+                        ).join(' ');
+                        eye.className = `${sizeClasses} ${trait.style}`;
+                    });
+                    document.getElementById(`trait-${traitType}`).textContent = `Eye Color: ${trait.type}`;
+                    break;
+                    
+                case 'hair-color':
+                    const hairColor = document.getElementById('hair');
+                    // Keep hairstyle, only change color
+                    const currentHairstyle = Array.from(hairColor.classList).filter(cls => 
+                        (cls.startsWith('w-') || cls.startsWith('h-') || cls.startsWith('rounded')) && !cls.startsWith('bg-')
+                    ).join(' ');
+                    
+                    hairColor.className = `absolute top-0 left-1/2 transform -translate-x-1/2 ${currentHairstyle} ${trait.style}`;
+                    document.getElementById(`trait-${traitType}`).textContent = `Hair Color: ${trait.type}`;
+                    break;
+                    
+                case 'ear-shape':
+                    const earsShape = document.getElementById('ears').querySelectorAll('div');
+                    earsShape.forEach((ear, index) => {
+                        // Keep ear color, only change shape
+                        const colorClass = Array.from(ear.classList).find(cls => cls.startsWith('bg-')) || 'bg-yellow-300';
+                        // Clear previous position transformations
+                        ear.className = ear.className.replace('translate-x-[-5px]', '').replace('translate-x-[5px]', '');
+                        ear.className = `${trait.style} ${colorClass}`;
+                        
+                        // Add special position handling for protruding ears
+                        if (trait.type === 'Protruding ears') {
+                            ear.classList.add(index === 0 ? 'translate-x-[-5px]' : 'translate-x-[5px]');
+                        }
+                    });
+                    document.getElementById(`trait-${traitType}`).textContent = `Ear Shape: ${trait.type}`;
+                    break;
+                    
+                case 'eye-size':
+                    const eyesSize = document.getElementById('eyes').querySelectorAll('div');
+                    eyesSize.forEach(eye => {
+                        // Keep eye color, only change size
+                        const colorClass = Array.from(eye.classList).find(cls => cls.startsWith('bg-')) || 'bg-gray-800';
+                        eye.className = `${trait.style} ${colorClass}`;
+                    });
+                    
+                    // Adjust eye spacing to accommodate different sizes
+                    const eyeContainer = document.getElementById('eyes');
+                    if (trait.type === 'Small eyes') {
+                        eyeContainer.className = 'absolute top-16 left-1/2 transform -translate-x-1/2 flex justify-between w-18';
+                    } else if (trait.type === 'Medium eyes') {
+                        eyeContainer.className = 'absolute top-16 left-1/2 transform -translate-x-1/2 flex justify-between w-20';
+                    } else if (trait.type === 'Large eyes') {
+                        eyeContainer.className = 'absolute top-16 left-1/2 transform -translate-x-1/2 flex justify-between w-22';
+                    } else if (trait.type === 'Oversized eyes') {
+                        eyeContainer.className = 'absolute top-16 left-1/2 transform -translate-x-1/2 flex justify-between w-24';
+                    }
+                    
+                    document.getElementById(`trait-${traitType}`).textContent = `Eye Size: ${trait.type}`;
+                    break;
+            }
+        }
+        
+        // Open help modal
+        function openHelpModal() {
+            helpModal.classList.remove('opacity-0', 'pointer-events-none');
+            helpModal.querySelector('div').classList.remove('scale-95');
+            helpModal.querySelector('div').classList.add('scale-100');
+            document.body.style.overflow = 'hidden';
+        }
+        
+        // Close help modal
+        function closeHelpModal() {
+            helpModal.classList.add('opacity-0', 'pointer-events-none');
+            helpModal.querySelector('div').classList.remove('scale-100');
+            helpModal.querySelector('div').classList.add('scale-95');
+            document.body.style.overflow = '';
+        }
+        
+        // Initialize game
+        document.addEventListener('DOMContentLoaded', initGame);
+    </script>
+</body>
+</html>
+    
